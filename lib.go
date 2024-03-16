@@ -56,17 +56,21 @@ func nameValidate(name string) error {
 }
 
 func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
-	indexPtElems, err := ReadAllFiles(linuxFolderPath, partitionName)
-	if indexPtElems == nil {
+	indexElems, err := ReadAllFiles(linuxFolderPath, partitionName)
+	if indexElems == nil {
 		return err
 	}
 
 	partitionPath := filepath.Join(linuxFolderPath, partitionName+".f109")
 
-	usedSizeOfIndexPt := getWrittenIndexPartition(indexPtElems)
-	dataEnd := usedSizeOfIndexPt + int64(len(data)) + 1
-	partitionSize := getFileSize(partitionPath)
-	if dataEnd > partitionSize {
+	indexesBeginOffset, err := findIndexesBeginOffset(linuxFolderPath, partitionName)
+	if err != nil {
+		return err
+	}
+
+	lastFileBytesEnd := getLastFileBytesEnd(indexElems)
+	dataEnd := lastFileBytesEnd + int64(len(data)) + 1
+	if dataEnd >= indexesBeginOffset {
 		return errors.New("you have reached the end of the partition")
 	}
 
@@ -78,7 +82,7 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 
 	// delete old file contents if exists
 	var fileElem IndexElem
-	for _, elem := range indexPtElems {
+	for _, elem := range indexElems {
 		if elem.FileName == name {
 			fileElem = elem
 			break
@@ -90,17 +94,17 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 		partitionHandle.WriteAt(emptyData, fileElem.DataBegin)
 	}
 
-	_, err = partitionHandle.WriteAt(data, usedSizeOfIndexPt+1)
+	_, err = partitionHandle.WriteAt(data, lastFileBytesEnd+1)
 	if err != nil {
 		return errors.Wrap(err, "os error")
 	}
 
-	indexPtElem := IndexElem{FileName: name, DataBegin: usedSizeOfIndexPt + 1,
+	indexPtElem := IndexElem{FileName: name, DataBegin: lastFileBytesEnd + 1,
 		DataEnd: dataEnd}
 
-	indexPtElems = append(indexPtElems, indexPtElem)
+	indexElems = append(indexElems, indexPtElem)
 
-	return rewriteIndexAtBase(linuxFolderPath, partitionName, indexPtElems)
+	return rewriteIndexAtBase(linuxFolderPath, partitionName, indexElems)
 }
 
 func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexElem) error {
@@ -124,6 +128,53 @@ func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexElem
 	indexOffset := partitionSize - int64(len(out))
 	partitionHandle.WriteAt([]byte(out), indexOffset)
 	return nil
+}
+
+func findIndexesBeginOffset(linuxFolderPath, partitionName string) (int64, error) {
+	sizeOfBeginStr := len(IndexBegin)
+
+	partitionPath := filepath.Join(linuxFolderPath, partitionName+".f109")
+	partitionSize := getFileSize(partitionPath)
+
+	sizeOfEndStr := len(IndexEnd)
+
+	partitionHandle, err := os.OpenFile(partitionPath, os.O_RDWR, 0666)
+	if err != nil {
+		return 0, errors.Wrap(err, "os error")
+	}
+	defer partitionHandle.Close()
+
+	lastBytes := make([]byte, len(IndexEnd))
+	_, err = partitionHandle.ReadAt(lastBytes, partitionSize-int64(sizeOfEndStr))
+	if err != nil {
+		return 0, errors.Wrap(err, "os error")
+	}
+
+	if string(lastBytes) != IndexEnd {
+		return 0, nil
+	}
+
+	endOffset := int64(0)
+	for i := int64(1); i < partitionSize; i++ {
+		// fmt.Println(i)
+		aByte := make([]byte, 1)
+		readOffset := partitionSize - int64(sizeOfEndStr) - i
+		_, err = partitionHandle.ReadAt(aByte, readOffset)
+		if err != nil {
+			return 0, errors.Wrap(err, "os error")
+		}
+		if string(aByte) == "=" {
+			endBytes := make([]byte, sizeOfBeginStr)
+			partitionHandle.ReadAt(endBytes, readOffset-int64(sizeOfBeginStr)+1)
+
+			if string(endBytes) == IndexBegin {
+				endOffset = readOffset - int64(sizeOfBeginStr+1)
+				break
+			}
+		}
+	}
+
+	return endOffset, nil
 }
 
 func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexElem, error) {
@@ -240,7 +291,7 @@ func getFileSize(path string) int64 {
 	return stats.Size()
 }
 
-func getWrittenIndexPartition(IndexElems []IndexElem) int64 {
+func getLastFileBytesEnd(IndexElems []IndexElem) int64 {
 	if len(IndexElems) == 0 {
 		return 0
 	}
