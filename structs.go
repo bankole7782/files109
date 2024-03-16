@@ -1,12 +1,12 @@
 package files109
 
-type IndexPartitionElem struct {
+type IndexElem struct {
 	FileName  string
 	DataBegin int64
 	DataEnd   int64
 }
 
 const (
-	IndexPartitionEnd   = "===END==="
-	IndexPartitionBegin = "===BEGIN==="
+	IndexEnd   = "===END==="
+	IndexBegin = "===BEGIN==="
 )

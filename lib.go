@@ -77,7 +77,7 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 	defer partitionHandle.Close()
 
 	// delete old file contents if exists
-	var fileElem IndexPartitionElem
+	var fileElem IndexElem
 	for _, elem := range indexPtElems {
 		if elem.FileName == name {
 			fileElem = elem
@@ -95,7 +95,7 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 		return errors.Wrap(err, "os error")
 	}
 
-	indexPtElem := IndexPartitionElem{FileName: name, DataBegin: usedSizeOfIndexPt + 1,
+	indexPtElem := IndexElem{FileName: name, DataBegin: usedSizeOfIndexPt + 1,
 		DataEnd: dataEnd}
 
 	indexPtElems = append(indexPtElems, indexPtElem)
@@ -103,7 +103,7 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 	return rewriteIndexAtBase(linuxFolderPath, partitionName, indexPtElems)
 }
 
-func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexPartitionElem) error {
+func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexElem) error {
 	partitionPath := filepath.Join(linuxFolderPath, partitionName+".f109")
 	partitionHandle, err := os.OpenFile(partitionPath, os.O_RDWR, 0666)
 	if err != nil {
@@ -111,13 +111,13 @@ func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexPart
 	}
 	defer partitionHandle.Close()
 
-	out := IndexPartitionBegin
+	out := IndexBegin
 	for _, elem := range elems {
 		tmp := fmt.Sprintf("data_key: %s\ndata_begin: %d\ndata_end:%d\n\n", elem.FileName,
 			elem.DataBegin, elem.DataEnd)
 		out += tmp
 	}
-	out += IndexPartitionEnd
+	out += IndexEnd
 
 	partitionSize := getFileSize(partitionPath)
 
@@ -126,15 +126,15 @@ func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexPart
 	return nil
 }
 
-func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexPartitionElem, error) {
-	emptyElems := make([]IndexPartitionElem, 0)
+func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexElem, error) {
+	emptyElems := make([]IndexElem, 0)
 
-	sizeOfBeginStr := len(IndexPartitionBegin)
+	sizeOfBeginStr := len(IndexBegin)
 
 	partitionPath := filepath.Join(linuxFolderPath, partitionName+".f109")
 	partitionSize := getFileSize(partitionPath)
 
-	sizeOfEndStr := len(IndexPartitionEnd)
+	sizeOfEndStr := len(IndexEnd)
 
 	partitionHandle, err := os.OpenFile(partitionPath, os.O_RDWR, 0666)
 	if err != nil {
@@ -142,13 +142,13 @@ func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexPartitionElem, 
 	}
 	defer partitionHandle.Close()
 
-	lastBytes := make([]byte, len(IndexPartitionEnd))
+	lastBytes := make([]byte, len(IndexEnd))
 	_, err = partitionHandle.ReadAt(lastBytes, partitionSize-int64(sizeOfEndStr))
 	if err != nil {
 		return nil, errors.Wrap(err, "os error")
 	}
 
-	if string(lastBytes) != IndexPartitionEnd {
+	if string(lastBytes) != IndexEnd {
 		return emptyElems, nil
 	}
 
@@ -166,7 +166,7 @@ func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexPartitionElem, 
 			endBytes := make([]byte, sizeOfBeginStr)
 			partitionHandle.ReadAt(endBytes, readOffset-int64(sizeOfBeginStr)+1)
 
-			if string(endBytes) == IndexPartitionBegin {
+			if string(endBytes) == IndexBegin {
 				break
 			}
 		} else {
@@ -179,16 +179,16 @@ func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexPartitionElem, 
 	return ret, nil
 }
 
-func parseIndexesString(load string) ([]IndexPartitionElem, error) {
-	ret := make([]IndexPartitionElem, 0)
+func parseIndexesString(load string) ([]IndexElem, error) {
+	ret := make([]IndexElem, 0)
 
-	tmpMap := make(map[string]IndexPartitionElem)
+	tmpMap := make(map[string]IndexElem)
 	cleanedF1File := strings.ReplaceAll(string(load), "\r", "")
 	partsOfRawF1File := strings.Split(cleanedF1File, "\n\n")
 	for _, part := range partsOfRawF1File {
 		innerParts := strings.Split(strings.TrimSpace(part), "\n")
 
-		var elem IndexPartitionElem
+		var elem IndexElem
 		for _, line := range innerParts {
 			var colonIndex int
 			for i, ch := range line {
@@ -240,13 +240,13 @@ func getFileSize(path string) int64 {
 	return stats.Size()
 }
 
-func getWrittenIndexPartition(indexPartitionElems []IndexPartitionElem) int64 {
-	if len(indexPartitionElems) == 0 {
+func getWrittenIndexPartition(IndexElems []IndexElem) int64 {
+	if len(IndexElems) == 0 {
 		return 0
 	}
 
 	largestByteEnd := int64(0)
-	for _, elem := range indexPartitionElems {
+	for _, elem := range IndexElems {
 		if elem.DataEnd > largestByteEnd {
 			largestByteEnd = elem.DataEnd
 		}
@@ -261,7 +261,7 @@ func ReadFile(linuxFolderPath, partitionName, name string) ([]byte, error) {
 		return nil, err
 	}
 
-	var fileElem IndexPartitionElem
+	var fileElem IndexElem
 	for _, elem := range elems {
 		if elem.FileName == name {
 			fileElem = elem
@@ -290,7 +290,7 @@ func DeleteFile(linuxFolderPath, partitionName, name string) error {
 	}
 
 	var elemIndex int
-	var fileElem IndexPartitionElem
+	var fileElem IndexElem
 	for i, elem := range elems {
 		if elem.FileName == name {
 			fileElem = elem
