@@ -8,9 +8,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 )
+
+var mutex sync.RWMutex
 
 func CreatePartition(linuxFolderPath, partitionName string, sizeInGBs int) error {
 	// validate partition name
@@ -60,6 +63,9 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 	if indexElems == nil {
 		return err
 	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	partitionPath := filepath.Join(linuxFolderPath, partitionName+".f109")
 
@@ -178,6 +184,8 @@ func findIndexesBeginOffset(linuxFolderPath, partitionName string) (int64, error
 }
 
 func ReadAllFiles(linuxFolderPath, partitionName string) ([]IndexElem, error) {
+	mutex.RLock()
+	defer mutex.RUnlock()
 	emptyElems := make([]IndexElem, 0)
 
 	sizeOfBeginStr := len(IndexBegin)
@@ -312,6 +320,9 @@ func ReadFile(linuxFolderPath, partitionName, name string) ([]byte, error) {
 		return nil, err
 	}
 
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	var fileElem IndexElem
 	for _, elem := range elems {
 		if elem.FileName == name {
@@ -339,6 +350,9 @@ func DeleteFile(linuxFolderPath, partitionName, name string) error {
 	if err != nil {
 		return err
 	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	var elemIndex int
 	var fileElem IndexElem
