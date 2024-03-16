@@ -1,6 +1,8 @@
 # files109
 A files system demonstration for linux.
-This files system is aimed at having no file limits.
+
+This files system is aimed at supporting unlimited files.
+The number of files here is dependent on the size of the files system.
 
 ## Brief Description
 
