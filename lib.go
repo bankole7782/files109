@@ -246,7 +246,14 @@ func getWrittenIndexPartition(indexPartitionElems []IndexPartitionElem) int64 {
 		return 0
 	}
 
-	return indexPartitionElems[len(indexPartitionElems)-1].DataEnd
+	largestByteEnd := int64(0)
+	for _, elem := range indexPartitionElems {
+		if elem.DataEnd > largestByteEnd {
+			largestByteEnd = elem.DataEnd
+		}
+	}
+
+	return largestByteEnd
 }
 
 func ReadFile(linuxFolderPath, partitionName, name string) ([]byte, error) {
