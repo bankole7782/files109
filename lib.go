@@ -71,11 +71,6 @@ func nameValidate(name string) error {
 }
 
 func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
-
-	// // delete old file if exists
-	// DeleteFile(linuxFolderPath, partitionName, name)
-
-	//begin
 	indexPtElems, err := ReadIndexPartition(linuxFolderPath, partitionName)
 	if indexPtElems == nil {
 		return err
@@ -95,6 +90,20 @@ func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 		return errors.Wrap(err, "os error")
 	}
 	defer dataPartitionHandle.Close()
+
+	// delete old file contents if exists
+	var fileElem IndexPartitionElem
+	for _, elem := range indexPtElems {
+		if elem.FileName == name {
+			fileElem = elem
+			break
+		}
+	}
+
+	if fileElem.FileName != "" {
+		emptyData := make([]byte, fileElem.DataEnd-fileElem.DataBegin)
+		dataPartitionHandle.WriteAt(emptyData, fileElem.DataBegin)
+	}
 
 	_, err = dataPartitionHandle.WriteAt(data, usedSizeOfIndexPt+1)
 	if err != nil {
