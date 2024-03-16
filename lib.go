@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -71,6 +72,10 @@ func nameValidate(name string) error {
 
 func WriteFile(linuxFolderPath, partitionName, name string, data []byte) error {
 
+	// // delete old file if exists
+	// DeleteFile(linuxFolderPath, partitionName, name)
+
+	//begin
 	indexPtElems, err := ReadIndexPartition(linuxFolderPath, partitionName)
 	if indexPtElems == nil {
 		return err
@@ -178,6 +183,7 @@ func ReadIndexPartition(linuxFolderPath, partitionName string) ([]IndexPartition
 func parseIndexPartitionString(load string) ([]IndexPartitionElem, error) {
 	ret := make([]IndexPartitionElem, 0)
 
+	tmpMap := make(map[string]IndexPartitionElem)
 	cleanedF1File := strings.ReplaceAll(string(load), "\r", "")
 	partsOfRawF1File := strings.Split(cleanedF1File, "\n\n")
 	for _, part := range partsOfRawF1File {
@@ -220,6 +226,10 @@ func parseIndexPartitionString(load string) ([]IndexPartitionElem, error) {
 		if elem.FileName == "" {
 			continue
 		}
+		tmpMap[elem.FileName] = elem
+	}
+
+	for _, elem := range tmpMap {
 		ret = append(ret, elem)
 	}
 
@@ -265,4 +275,35 @@ func ReadFile(linuxFolderPath, partitionName, name string) ([]byte, error) {
 	dataPartitionHandle.ReadAt(fileData, fileElem.DataBegin)
 
 	return fileData, nil
+}
+
+func DeleteFile(linuxFolderPath, partitionName, name string) error {
+	elems, err := ReadIndexPartition(linuxFolderPath, partitionName)
+	if err != nil {
+		return err
+	}
+
+	var elemIndex int
+	var fileElem IndexPartitionElem
+	for i, elem := range elems {
+		if elem.FileName == name {
+			fileElem = elem
+			elemIndex = i
+		}
+	}
+
+	fileData := make([]byte, fileElem.DataEnd-fileElem.DataBegin)
+
+	_, dataPartitionPath := getPartitionFiles(linuxFolderPath, partitionName)
+	dataPartitionHandle, err := os.OpenFile(dataPartitionPath, os.O_WRONLY, 0666)
+	if err != nil {
+		return errors.Wrap(err, "os error")
+	}
+	defer dataPartitionHandle.Close()
+
+	dataPartitionHandle.WriteAt(fileData, fileElem.DataBegin)
+
+	newElems := slices.Delete(elems, elemIndex, elemIndex+1)
+
+	return rewriteIndexPartition(linuxFolderPath, partitionName, newElems)
 }
