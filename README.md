@@ -13,17 +13,17 @@ The files system is divided into two parts: indexes and data part
 The indexes part looks like this for example:
 ```
 ===BEGIN===
-data_key: james.txt
-data_begin: 10
-data_end: 109
+james.txt
+10
+109
 
-data_key: jame1.txt
-data_begin: 110
-data_end: 137
+jame1.txt
+110
+137
 
-data_key: jame2.txt
-data_begin: 138
-data_end: 142
+jame2.txt
+138
+142
 
 ===END===
 ```

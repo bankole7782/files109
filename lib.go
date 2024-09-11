@@ -123,7 +123,7 @@ func rewriteIndexAtBase(linuxFolderPath, partitionName string, elems []IndexElem
 
 	out := IndexBegin
 	for _, elem := range elems {
-		tmp := fmt.Sprintf("data_key: %s\ndata_begin: %d\ndata_end:%d\n\n", elem.FileName,
+		tmp := fmt.Sprintf("%s\n%d\n%d\n\n", elem.FileName,
 			elem.DataBegin, elem.DataEnd)
 		out += tmp
 	}
@@ -247,39 +247,23 @@ func parseIndexesString(load string) ([]IndexElem, error) {
 	for _, part := range partsOfRawF1File {
 		innerParts := strings.Split(strings.TrimSpace(part), "\n")
 
-		var elem IndexElem
-		for _, line := range innerParts {
-			var colonIndex int
-			for i, ch := range line {
-				if fmt.Sprintf("%c", ch) == ":" {
-					colonIndex = i
-					break
-				}
-			}
-
-			if colonIndex == 0 {
-				continue
-			}
-
-			optName := strings.TrimSpace(line[0:colonIndex])
-			optValue := strings.TrimSpace(line[colonIndex+1:])
-
-			if optName == "data_key" {
-				elem.FileName = optValue
-			} else if optName == "data_begin" {
-				data, err := strconv.ParseInt(optValue, 10, 64)
-				if err != nil {
-					return ret, errors.New("data_begin is not of type int64")
-				}
-				elem.DataBegin = data
-			} else if optName == "data_end" {
-				data, err := strconv.ParseInt(optValue, 10, 64)
-				if err != nil {
-					return ret, errors.New("data_end is not of type int64")
-				}
-				elem.DataEnd = data
-			}
+		if len(innerParts) != 3 {
+			continue
 		}
+
+		var elem IndexElem
+
+		elem.FileName = innerParts[0]
+		data, err := strconv.ParseInt(innerParts[1], 10, 64)
+		if err != nil {
+			return ret, errors.New("data_begin is not of type int64")
+		}
+		elem.DataBegin = data
+		data2, err := strconv.ParseInt(innerParts[2], 10, 64)
+		if err != nil {
+			return ret, errors.New("data_end is not of type int64")
+		}
+		elem.DataEnd = data2
 
 		if elem.FileName == "" {
 			continue
