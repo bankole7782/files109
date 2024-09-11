@@ -8,12 +8,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/pkg/errors"
 )
-
-var mutex sync.RWMutex
 
 func CreatePartition(linuxFolderPath, partitionName string, sizeInGBs int) error {
 	// validate partition name
